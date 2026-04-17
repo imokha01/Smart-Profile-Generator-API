@@ -11,6 +11,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// HEALTH CHECK
 app.get("/", (req, res) => {
   res.send("API is running");
 });
