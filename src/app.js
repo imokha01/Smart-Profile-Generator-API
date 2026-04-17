@@ -1,4 +1,3 @@
-// src/app.js
 import express from "express";
 import profileRoutes from "./routes/profile.routes.js";
 
@@ -10,6 +9,10 @@ app.use(express.json());
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   next();
+});
+
+app.get("/", (req, res) => {
+  res.send("API is running");
 });
 
 app.use("/api", profileRoutes);
