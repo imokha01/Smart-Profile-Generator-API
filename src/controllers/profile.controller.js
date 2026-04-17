@@ -125,5 +125,10 @@ export const deleteProfile = async (req, res) => {
     });
   }
 
-  return res.status(204).send();
+  return res.status(204).json(
+    {
+      status: "success",
+      message: "Profile deleted"
+    }
+  );
 };
