@@ -187,10 +187,10 @@ export const getAllProfiles = async (req, res) => {
 // SEARCH PROFILES BY QUERY
 export const searchProfiles = async (req, res) => {
   try {
-    const { q, page = "1", limit = "10" } = req.query;
+    const { q } = req.query;
 
-    // VALIDATION
-    // -----------------------
+    let { page = 1, limit = 10 } = req.query;
+
     if (!q || typeof q !== "string") {
       return res.status(400).json({
         status: "error",
@@ -207,38 +207,21 @@ export const searchProfiles = async (req, res) => {
       });
     }
 
-    // PAGINATION FIX
-    // -----------------------
-    let pageNum = Number(page);
-    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
-
-    let limitNum = Number(limit);
-    if (isNaN(limitNum) || limitNum < 1) limitNum = 10;
-    if (limitNum > 50) limitNum = 50;
-
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit) || 10, 1), 50);
     const skip = (pageNum - 1) * limitNum;
 
-    
-    // QUERY EXECUTION
-    // -----------------------
-    const [results, total] = await Promise.all([
-      Profile.find(filters)
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
-
+    const [data, total] = await Promise.all([
+      Profile.find(filters).skip(skip).limit(limitNum).lean(),
       Profile.countDocuments(filters)
     ]);
 
-    // -----------------------
-    // RESPONSE (GRADER FORMAT)
-    // -----------------------
     return res.status(200).json({
       status: "success",
       page: pageNum,
       limit: limitNum,
       total,
-      data: results
+      data
     });
 
   } catch (err) {
@@ -248,6 +231,7 @@ export const searchProfiles = async (req, res) => {
     });
   }
 };
+
 
 
 
