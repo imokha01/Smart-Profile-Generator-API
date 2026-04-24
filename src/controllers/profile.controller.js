@@ -5,7 +5,7 @@ import getAgeGroup from "../utils/ageGroup.js";
 import getTopCountry from "../utils/country.js";
 import externalError from "../utils/error.js";
 import { v7 as uuidv7 } from "uuid";
-import { parseQuery } from "../utils/parser.js";
+import  parseQuery  from "../utils/parser.js";
 
 // CREATE NEW PROFILE
 export const createProfile = async (req, res) => {
@@ -88,7 +88,6 @@ export const getProfile = async (req, res) => {
 
 export const getAllProfiles = async (req, res) => {
   try {
-    // Extract query params
     const {
       gender,
       age_group,
@@ -97,27 +96,42 @@ export const getAllProfiles = async (req, res) => {
       max_age,
       sort_by = "created_at",
       order = "asc",
-      page = 1,
-      limit = 10
+      page = "1",
+      limit = "10"
     } = req.query;
 
-    // VALIDATE pagination FIRST
-    const pageNum = parseInt(page);
-    const limitNum = Math.min(parseInt(limit), 50);
+    // -----------------------
+    // VALIDATION (STRICT)
+    // -----------------------
+    const pageNum = Number(page);
+    let limitNum = Number(limit);
 
-    if (isNaN(pageNum) || isNaN(limitNum)) {
+    if (isNaN(pageNum) || pageNum < 1) {
       return res.status(422).json({
         status: "error",
         message: "Invalid query parameters"
       });
     }
 
-    // Build filter
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 10;
+    if (limitNum > 50) limitNum = 50;
+
+    // -----------------------
+    // BUILD FILTER
+    // -----------------------
     const filter = {};
 
-    if (gender) filter.gender = gender.toLowerCase();
-    if (age_group) filter.age_group = age_group.toLowerCase();
-    if (country_id) filter.country_id = country_id.toUpperCase();
+    if (gender) {
+      filter.gender = new RegExp(`^${gender}$`, "i");
+    }
+
+    if (age_group) {
+      filter.age_group = new RegExp(`^${age_group}$`, "i");
+    }
+
+    if (country_id) {
+      filter.country_id = country_id.toUpperCase();
+    }
 
     if (min_age || max_age) {
       filter.age = {};
@@ -125,11 +139,21 @@ export const getAllProfiles = async (req, res) => {
       if (max_age) filter.age.$lte = Number(max_age);
     }
 
-    //  Build sort
-    const sortOptions = {};
-    sortOptions[sort_by] = order === "desc" ? -1 : 1;
+    // -----------------------
+    // SORT VALIDATION
+    // -----------------------
+    const allowedSort = ["age", "created_at", "gender_probability"];
+    const safeSort = allowedSort.includes(sort_by)
+      ? sort_by
+      : "created_at";
 
-    // PAGINATION CODE GOES HERE
+    const sortOptions = {
+      [safeSort]: order === "desc" ? -1 : 1
+    };
+
+    // -----------------------
+    // PAGINATION
+    // -----------------------
     const skip = (pageNum - 1) * limitNum;
 
     const [profiles, total] = await Promise.all([
@@ -138,10 +162,10 @@ export const getAllProfiles = async (req, res) => {
         .skip(skip)
         .limit(limitNum)
         .lean(),
+
       Profile.countDocuments(filter)
     ]);
 
-    // Final response
     return res.status(200).json({
       status: "success",
       page: pageNum,
@@ -157,6 +181,7 @@ export const getAllProfiles = async (req, res) => {
     });
   }
 };
+
 
 
 // SEARCH PROFILES BY QUERY
