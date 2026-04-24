@@ -12,6 +12,7 @@ const router = express.Router();
 router.post("/profiles", createProfile);
 router.get("/profiles", getAllProfiles);
 router.get("/profiles/:id", getProfile);
+router.get("/profiles/search", getProfile);
 router.delete("/profiles/:id", deleteProfile);
 
 export default router;

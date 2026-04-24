@@ -5,6 +5,7 @@ import getAgeGroup from "../utils/ageGroup.js";
 import getTopCountry from "../utils/country.js";
 import externalError from "../utils/error.js";
 import { v7 as uuidv7 } from "uuid";
+import { parseQuery } from "../utils/parser.js";
 
 // CREATE NEW PROFILE
 export const createProfile = async (req, res) => {
@@ -199,6 +200,55 @@ export const getProfile = async (req, res) => {
     status: "success",
     data: profile
   });
+};
+
+
+// SEARCH PROFILES BY QUERY
+export const searchProfiles = async (req, res) => {
+  try {
+    const { q, page = 1, limit = 10 } = req.query;
+
+    const parsed = parseQuery(q);
+
+    if (!parsed) {
+      return res.status(400).json({
+        status: "error",
+        message: "Unable to interpret query"
+      });
+    }
+
+    const filter = {};
+
+    if (parsed.gender) filter.gender = parsed.gender;
+    if (parsed.age_group) filter.age_group = parsed.age_group;
+    if (parsed.country_id) filter.country_id = parsed.country_id;
+
+    if (parsed.min_age || parsed.max_age) {
+      filter.age = {};
+      if (parsed.min_age) filter.age.$gte = parsed.min_age;
+      if (parsed.max_age) filter.age.$lte = parsed.max_age;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const profiles = await Profile.find(filter)
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    return res.status(200).json({
+      status: "success",
+      page: Number(page),
+      limit: Number(limit),
+      data: profiles
+    });
+
+  } catch {
+    return res.status(500).json({
+      status: "error",
+      message: "Internal server error"
+    });
+  }
 };
 
 
