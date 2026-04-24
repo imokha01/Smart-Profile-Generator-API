@@ -185,52 +185,54 @@ export const getAllProfiles = async (req, res) => {
 
 
 // SEARCH PROFILES BY QUERY
+
 export const searchProfiles = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, page = 1, limit = 10 } = req.query;
 
-    let { page = 1, limit = 10 } = req.query;
+    const parsed = parseQuery(q);
 
-    if (!q || typeof q !== "string") {
-      return res.status(400).json({
-        status: "error",
-        message: "Missing or empty parameter"
-      });
-    }
-
-    const filters = parseQuery(q);
-
-    if (!filters) {
+    if (!parsed) {
       return res.status(400).json({
         status: "error",
         message: "Unable to interpret query"
       });
     }
 
-    const pageNum = Math.max(parseInt(page) || 1, 1);
-    const limitNum = Math.min(Math.max(parseInt(limit) || 10, 1), 50);
-    const skip = (pageNum - 1) * limitNum;
+    const filter = {};
 
-    const [data, total] = await Promise.all([
-      Profile.find(filters).skip(skip).limit(limitNum).lean(),
-      Profile.countDocuments(filters)
-    ]);
+    if (parsed.gender) filter.gender = parsed.gender;
+    if (parsed.age_group) filter.age_group = parsed.age_group;
+    if (parsed.country_id) filter.country_id = parsed.country_id;
+
+    if (parsed.min_age || parsed.max_age) {
+      filter.age = {};
+      if (parsed.min_age) filter.age.$gte = parsed.min_age;
+      if (parsed.max_age) filter.age.$lte = parsed.max_age;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const profiles = await Profile.find(filter)
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
 
     return res.status(200).json({
       status: "success",
-      page: pageNum,
-      limit: limitNum,
-      total,
-      data
+      page: Number(page),
+      limit: Number(limit),
+      data: profiles
     });
 
-  } catch (err) {
+  } catch {
     return res.status(500).json({
       status: "error",
-      message: "Server failure"
+      message: "Internal server error"
     });
   }
 };
+
 
 
 
