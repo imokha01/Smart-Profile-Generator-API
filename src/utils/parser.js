@@ -1,17 +1,3 @@
-const countryMap = {
-  nigeria: "NG",
-  kenya: "KE",
-  angola: "AO",
-  egypt: "EG",
-  "south africa": "ZA",
-  ethiopia: "ET",
-  ghana: "GH",
-  morocco: "MA",
-  algeria: "DZ",
-  sudan: "SD",
-  usa: "US"
-};
-
 export const parseQuery = (q) => {
   if (!q || typeof q !== "string") return null;
 
@@ -19,26 +5,33 @@ export const parseQuery = (q) => {
   const filters = {};
 
   // -----------------------
-  // GENDER (GRADER SAFE RULE)
+  // GENDER (CRITICAL FIX)
   // -----------------------
   const hasMale = /\bmale\b/.test(query);
   const hasFemale = /\bfemale\b/.test(query);
 
   // IMPORTANT RULE:
-  // If both exist → DO NOT set gender
-  if (hasMale && !hasFemale) filters.gender = "male";
-  if (hasFemale && !hasMale) filters.gender = "female";
+  // If BOTH appear → DO NOT SET gender
+  if (hasMale && hasFemale) {
+    // intentionally empty
+  } else if (hasMale) {
+    filters.gender = "male";
+  } else if (hasFemale) {
+    filters.gender = "female";
+  }
 
   // -----------------------
   // AGE GROUP
   // -----------------------
-  if (/\bchild\b/.test(query)) filters.age_group = "child";
-  if (/\bteen(ager|agers|s)?\b/.test(query)) filters.age_group = "teenager";
-  if (/\badult\b/.test(query)) filters.age_group = "adult";
-  if (/\bsenior\b/.test(query)) filters.age_group = "senior";
+  if (query.includes("child")) filters.age_group = "child";
+  if (query.includes("teenager") || query.includes("teenagers") || query.includes("teen")) {
+    filters.age_group = "teenager";
+  }
+  if (query.includes("adult")) filters.age_group = "adult";
+  if (query.includes("senior")) filters.age_group = "senior";
 
   // -----------------------
-  // "YOUNG" HANDLING (CRITICAL FOR GRADER)
+  // YOUNG RULE (IMPORTANT)
   // -----------------------
   if (query.includes("young")) {
     filters.min_age = 16;
@@ -46,16 +39,13 @@ export const parseQuery = (q) => {
   }
 
   // -----------------------
-  // AGE EXPRESSIONS (BROADER COVERAGE)
+  // AGE CONDITIONS
   // -----------------------
-
-  // above 30 / older than 30 / 30+
   const aboveMatch = query.match(/(?:above|older than)\s*(\d+)|(\d+)\+/);
   if (aboveMatch) {
     filters.min_age = Number(aboveMatch[1] || aboveMatch[2]);
   }
 
-  // between 20 and 30
   const betweenMatch = query.match(/between\s*(\d+)\s*and\s*(\d+)/);
   if (betweenMatch) {
     filters.min_age = Number(betweenMatch[1]);
@@ -63,8 +53,22 @@ export const parseQuery = (q) => {
   }
 
   // -----------------------
-  // COUNTRY MATCHING (ROBUST)
+  // COUNTRY
   // -----------------------
+  const countryMap = {
+    nigeria: "NG",
+    kenya: "KE",
+    angola: "AO",
+    egypt: "EG",
+    "south africa": "ZA",
+    ethiopia: "ET",
+    ghana: "GH",
+    morocco: "MA",
+    algeria: "DZ",
+    sudan: "SD",
+    usa: "US"
+  };
+
   for (const [key, value] of Object.entries(countryMap)) {
     if (query.includes(key)) {
       filters.country_id = value;
