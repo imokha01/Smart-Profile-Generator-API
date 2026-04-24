@@ -88,36 +88,33 @@ export const getProfile = async (req, res) => {
 
 export const getAllProfiles = async (req, res) => {
   try {
+    // 1️⃣ Extract query params
     let {
       gender,
       age_group,
       country_id,
       min_age,
       max_age,
-      min_gender_probability,
-      min_country_probability,
       sort_by = "created_at",
       order = "asc",
       page = 1,
       limit = 10
     } = req.query;
 
-    // --- VALIDATION ---
-    page = parseInt(page);
-    limit = parseInt(limit);
+    // 2️⃣ VALIDATE pagination FIRST
+    const pageNum = parseInt(page);
+    const limitNum = Math.min(parseInt(limit), 50);
 
-    if (isNaN(page) || isNaN(limit)) {
+    if (isNaN(pageNum) || isNaN(limitNum)) {
       return res.status(422).json({
         status: "error",
         message: "Invalid query parameters"
       });
     }
 
-    if (limit > 50) limit = 50;
-
+    // 3️⃣ Build filter
     const filter = {};
 
-    // --- FILTERS ---
     if (gender) filter.gender = gender.toLowerCase();
     if (age_group) filter.age_group = age_group.toLowerCase();
     if (country_id) filter.country_id = country_id.toUpperCase();
@@ -128,43 +125,27 @@ export const getAllProfiles = async (req, res) => {
       if (max_age) filter.age.$lte = Number(max_age);
     }
 
-    if (min_gender_probability) {
-      filter.gender_probability = { $gte: Number(min_gender_probability) };
-    }
-
-    if (min_country_probability) {
-      filter.country_probability = { $gte: Number(min_country_probability) };
-    }
-
-    // --- SORT ---
+    // 4️⃣ Build sort
     const sortOptions = {};
-    const allowedSort = ["age", "created_at", "gender_probability"];
-
-    if (!allowedSort.includes(sort_by)) {
-      return res.status(422).json({
-        status: "error",
-        message: "Invalid query parameters"
-      });
-    }
-
     sortOptions[sort_by] = order === "desc" ? -1 : 1;
 
-    // --- PAGINATION ---
-    const skip = (page - 1) * limit;
+    // 5️⃣ 👉 PAGINATION CODE GOES HERE
+    const skip = (pageNum - 1) * limitNum;
 
     const [profiles, total] = await Promise.all([
       Profile.find(filter)
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit)
+        .limit(limitNum)
         .lean(),
       Profile.countDocuments(filter)
     ]);
 
+    // 6️⃣ Final response
     return res.status(200).json({
       status: "success",
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
       total,
       data: profiles
     });
@@ -204,17 +185,20 @@ export const searchProfiles = async (req, res) => {
       if (parsed.max_age) filter.age.$lte = parsed.max_age;
     }
 
-    const skip = (page - 1) * limit;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = Math.min(parseInt(limit) || 10, 50);
+
+    const skip = (pageNum - 1) * limitNum;
 
     const profiles = await Profile.find(filter)
       .skip(skip)
-      .limit(Number(limit))
+      .limit(limitNum)
       .lean();
 
     return res.status(200).json({
       status: "success",
-      page: Number(page),
-      limit: Number(limit),
+      page: pageNum,
+      limit: limitNum,
       data: profiles
     });
 
@@ -225,6 +209,7 @@ export const searchProfiles = async (req, res) => {
     });
   }
 };
+
 
 
 // DELETE PROFILE BY ID

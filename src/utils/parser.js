@@ -1,5 +1,3 @@
-// src/utils/parser.js
-
 const countryMap = {
   nigeria: "NG",
   kenya: "KE",
@@ -11,12 +9,14 @@ export const parseQuery = (q) => {
   if (!q || typeof q !== "string") return null;
 
   const query = q.toLowerCase();
-
   const filters = {};
 
   // Gender
-  if (query.includes("male")) filters.gender = "male";
-  if (query.includes("female")) filters.gender = "female";
+  if (query.includes("male") && !query.includes("female")) {
+    filters.gender = "male";
+  } else if (query.includes("female")) {
+    filters.gender = "female";
+  }
 
   // Age group
   if (query.includes("child")) filters.age_group = "child";
@@ -24,16 +24,23 @@ export const parseQuery = (q) => {
   if (query.includes("adult")) filters.age_group = "adult";
   if (query.includes("senior")) filters.age_group = "senior";
 
-  // "young" special case
+  // Young = 16–24
   if (query.includes("young")) {
     filters.min_age = 16;
     filters.max_age = 24;
   }
 
-  // Age numbers
-  const ageMatch = query.match(/above (\d+)/);
-  if (ageMatch) {
-    filters.min_age = Number(ageMatch[1]);
+  // Above age
+  const aboveMatch = query.match(/above (\d+)/);
+  if (aboveMatch) {
+    filters.min_age = Number(aboveMatch[1]);
+  }
+
+  // Between ages
+  const betweenMatch = query.match(/between (\d+) and (\d+)/);
+  if (betweenMatch) {
+    filters.min_age = Number(betweenMatch[1]);
+    filters.max_age = Number(betweenMatch[2]);
   }
 
   // Country
