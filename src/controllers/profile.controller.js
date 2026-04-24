@@ -5,7 +5,7 @@ import getAgeGroup from "../utils/ageGroup.js";
 import getTopCountry from "../utils/country.js";
 import externalError from "../utils/error.js";
 import { v7 as uuidv7 } from "uuid";
-import  parseQuery  from "../utils/parser.js";
+import { parseQuery } from "../utils/parser.js";
 
 // CREATE NEW PROFILE
 export const createProfile = async (req, res) => {
@@ -66,9 +66,6 @@ export const createProfile = async (req, res) => {
   }
 };
 
-
-
-
 // READ SINGLE PROFILE BY ID
 export const getProfile = async (req, res) => {
   const profile = await Profile.findOne({ id: req.params.id });
@@ -94,82 +91,69 @@ export const getAllProfiles = async (req, res) => {
       country_id,
       min_age,
       max_age,
+      min_gender_probability,
+      min_country_probability,
       sort_by = "created_at",
       order = "asc",
       page = "1",
       limit = "10"
     } = req.query;
 
-    // -----------------------
-    // VALIDATION (STRICT)
-    // -----------------------
-    const pageNum = Number(page);
-    let limitNum = Number(limit);
+    // 1. STRICT VALIDATION (Requirement: 422 for invalid types)
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
 
-    if (isNaN(pageNum) || pageNum < 1) {
+    if (isNaN(pageNum) || pageNum < 1 || isNaN(limitNum)) {
       return res.status(422).json({
         status: "error",
         message: "Invalid query parameters"
       });
     }
 
-    if (isNaN(limitNum) || limitNum < 1) limitNum = 10;
-    if (limitNum > 50) limitNum = 50;
+    const safeLimit = Math.min(50, Math.max(1, limitNum));
+    const skip = (pageNum - 1) * safeLimit;
 
-    // -----------------------
-    // BUILD FILTER
-    // -----------------------
+    // 2. BUILD FILTER
     const filter = {};
+    if (gender) filter.gender = gender.toLowerCase();
+    if (age_group) filter.age_group = age_group.toLowerCase();
+    if (country_id) filter.country_id = country_id.toUpperCase();
 
-    if (gender) {
-      filter.gender = new RegExp(`^${gender}$`, "i");
-    }
-
-    if (age_group) {
-      filter.age_group = new RegExp(`^${age_group}$`, "i");
-    }
-
-    if (country_id) {
-      filter.country_id = country_id.toUpperCase();
-    }
-
+    // Numerical Ranges
     if (min_age || max_age) {
       filter.age = {};
       if (min_age) filter.age.$gte = Number(min_age);
       if (max_age) filter.age.$lte = Number(max_age);
     }
 
-    // -----------------------
-    // SORT VALIDATION
-    // -----------------------
+    // Probability Filters (From Task Detail)
+    if (min_gender_probability) {
+      filter.gender_probability = { $gte: parseFloat(min_gender_probability) };
+    }
+    if (min_country_probability) {
+      filter.country_probability = { $gte: parseFloat(min_country_probability) };
+    }
+
+    // 3. SORT WHITELIST
     const allowedSort = ["age", "created_at", "gender_probability"];
-    const safeSort = allowedSort.includes(sort_by)
-      ? sort_by
-      : "created_at";
+    const sortField = allowedSort.includes(sort_by) ? sort_by : "created_at";
+    const sortOrder = order === "desc" ? -1 : 1;
 
-    const sortOptions = {
-      [safeSort]: order === "desc" ? -1 : 1
-    };
-
-    // -----------------------
-    // PAGINATION
-    // -----------------------
-    const skip = (pageNum - 1) * limitNum;
-
+    // 4. EXECUTION
     const [profiles, total] = await Promise.all([
       Profile.find(filter)
-        .sort(sortOptions)
+        .sort({ [sortField]: sortOrder })
         .skip(skip)
-        .limit(limitNum)
+        .limit(safeLimit)
+        .select("-__v")
         .lean(),
-
       Profile.countDocuments(filter)
     ]);
 
     return res.status(200).json({
       status: "success",
       page: pageNum,
-      limit: limitNum,
+      limit: safeLimit,
       total,
       data: profiles
     });
@@ -190,8 +174,17 @@ export const searchProfiles = async (req, res) => {
   try {
     const { q, page = 1, limit = 10 } = req.query;
 
+    // 1. Check if 'q' is missing (Requirement: 400 Bad Request)
+    if (!q) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing or empty parameter"
+      });
+    }
+
     const parsed = parseQuery(q);
 
+    // 2. Interpret check (Requirement: Specific error message)
     if (!parsed) {
       return res.status(400).json({
         status: "error",
@@ -199,10 +192,10 @@ export const searchProfiles = async (req, res) => {
       });
     }
 
+    // 3. Construct Mongoose Filter
     const filter = {};
-
-    if (parsed.gender) filter.gender = parsed.gender;
-    if (parsed.age_group) filter.age_group = parsed.age_group;
+    if (parsed.gender)     filter.gender = parsed.gender;
+    if (parsed.age_group)  filter.age_group = parsed.age_group;
     if (parsed.country_id) filter.country_id = parsed.country_id;
 
     if (parsed.min_age || parsed.max_age) {
@@ -211,29 +204,48 @@ export const searchProfiles = async (req, res) => {
       if (parsed.max_age) filter.age.$lte = parsed.max_age;
     }
 
-    const skip = (page - 1) * limit;
+    // 4. Pagination & Validation (Requirement: 422 for invalid types)
+    const p = parseInt(page, 10);
+    const l = parseInt(limit, 10);
 
-    const profiles = await Profile.find(filter)
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
+    if (isNaN(p) || isNaN(l) || p < 1) {
+      return res.status(422).json({
+        status: "error",
+        message: "Invalid query parameters"
+      });
+    }
 
+    const safeLimit = Math.min(50, l); // Task says max 50
+    const skip = (p - 1) * safeLimit;
+
+    // 5. Execute
+    const [profiles, total] = await Promise.all([
+      Profile.find(filter)
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .select("-__v")
+        .lean(),
+      Profile.countDocuments(filter)
+    ]);
+
+    // 6. Success Response (Exact Match to Task Schema)
     return res.status(200).json({
       status: "success",
-      page: Number(page),
-      limit: Number(limit),
+      page: p,
+      limit: safeLimit,
+      total,
       data: profiles
     });
 
-  } catch {
+  } catch (error) {
+    console.error("Search Error:", error);
     return res.status(500).json({
       status: "error",
       message: "Internal server error"
     });
   }
-};
-
-
+}
 
 
 
