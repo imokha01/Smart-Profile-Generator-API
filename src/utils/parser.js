@@ -2,6 +2,13 @@ const countryMap = {
   nigeria: "NG",
   kenya: "KE",
   angola: "AO",
+  egypt: "EG",
+  south_africa: "ZA",
+  ethiopia: "ET",
+  ghana: "GH",
+  morocco: "MA",
+  algeria: "DZ",
+  sudan: "SD",
   usa: "US"
 };
 
@@ -29,6 +36,11 @@ export const parseQuery = (q) => {
     filters.min_age = 16;
     filters.max_age = 24;
   }
+
+if (query.includes("teenager") || query.includes("teenagers")) {
+    filters.age_group = "teenager";
+  }
+
 
   // Above age
   const aboveMatch = query.match(/above (\d+)/);

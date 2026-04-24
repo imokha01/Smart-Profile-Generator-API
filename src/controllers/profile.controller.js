@@ -88,8 +88,8 @@ export const getProfile = async (req, res) => {
 
 export const getAllProfiles = async (req, res) => {
   try {
-    // 1️⃣ Extract query params
-    let {
+    // Extract query params
+    const {
       gender,
       age_group,
       country_id,
@@ -101,7 +101,7 @@ export const getAllProfiles = async (req, res) => {
       limit = 10
     } = req.query;
 
-    // 2️⃣ VALIDATE pagination FIRST
+    // VALIDATE pagination FIRST
     const pageNum = parseInt(page);
     const limitNum = Math.min(parseInt(limit), 50);
 
@@ -112,7 +112,7 @@ export const getAllProfiles = async (req, res) => {
       });
     }
 
-    // 3️⃣ Build filter
+    // Build filter
     const filter = {};
 
     if (gender) filter.gender = gender.toLowerCase();
@@ -125,11 +125,11 @@ export const getAllProfiles = async (req, res) => {
       if (max_age) filter.age.$lte = Number(max_age);
     }
 
-    // 4️⃣ Build sort
+    //  Build sort
     const sortOptions = {};
     sortOptions[sort_by] = order === "desc" ? -1 : 1;
 
-    // 5️⃣ 👉 PAGINATION CODE GOES HERE
+    // PAGINATION CODE GOES HERE
     const skip = (pageNum - 1) * limitNum;
 
     const [profiles, total] = await Promise.all([
@@ -141,7 +141,7 @@ export const getAllProfiles = async (req, res) => {
       Profile.countDocuments(filter)
     ]);
 
-    // 6️⃣ Final response
+    // Final response
     return res.status(200).json({
       status: "success",
       page: pageNum,
@@ -164,48 +164,43 @@ export const searchProfiles = async (req, res) => {
   try {
     const { q, page = 1, limit = 10 } = req.query;
 
-    const parsed = parseQuery(q);
+    if (!q) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing or empty parameter"
+      });
+    }
 
-    if (!parsed) {
+    const filters = parseQuery(q);
+
+    if (!filters) {
       return res.status(400).json({
         status: "error",
         message: "Unable to interpret query"
       });
     }
 
-    const filter = {};
-
-    if (parsed.gender) filter.gender = parsed.gender;
-    if (parsed.age_group) filter.age_group = parsed.age_group;
-    if (parsed.country_id) filter.country_id = parsed.country_id;
-
-    if (parsed.min_age || parsed.max_age) {
-      filter.age = {};
-      if (parsed.min_age) filter.age.$gte = parsed.min_age;
-      if (parsed.max_age) filter.age.$lte = parsed.max_age;
-    }
-
-    const pageNum = parseInt(page) || 1;
-    const limitNum = Math.min(parseInt(limit) || 10, 50);
-
+    const pageNum = parseInt(page);
+    const limitNum = Math.min(parseInt(limit), 50);
     const skip = (pageNum - 1) * limitNum;
 
-    const profiles = await Profile.find(filter)
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
+    const [data, total] = await Promise.all([
+      Profile.find(filters).skip(skip).limit(limitNum).lean(),
+      Profile.countDocuments(filters)
+    ]);
 
     return res.status(200).json({
       status: "success",
       page: pageNum,
       limit: limitNum,
-      data: profiles
+      total,
+      data
     });
 
-  } catch {
+  } catch (err) {
     return res.status(500).json({
       status: "error",
-      message: "Internal server error"
+      message: "Server failure"
     });
   }
 };
