@@ -19,6 +19,9 @@ const profileSchema = new mongoose.Schema({
   created_at: String
 });
 
+profileSchema.index({ gender: 1 });
+profileSchema.index({ country_id: 1 });
+profileSchema.index({ age: 1 });
 
 
 export default mongoose.model("Profile", profileSchema);

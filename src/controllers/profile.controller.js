@@ -67,32 +67,25 @@ export const createProfile = async (req, res) => {
 };
 
 
-// VALIDATE EXTERNAL API RESPONSES
-if (!apiData.gender.gender || apiData.gender.count === 0) {
-  return res.status(502).json({
-    status: "error",
-    message: "Genderize returned an invalid response"
+
+
+// READ SINGLE PROFILE BY ID
+export const getProfile = async (req, res) => {
+  const profile = await Profile.findOne({ id: req.params.id });
+
+  if (!profile) {
+    return res.status(404).json({
+      status: "error",
+      message: "Profile not found"
+    });
+  }
+
+  return res.status(200).json({
+    status: "success",
+    data: profile
   });
-}
+};
 
-if (!apiData.age.age) {
-  return res.status(502).json({
-    status: "error",
-    message: "Agify returned an invalid response"
-  });
-}
-
-const topCountry = getTopCountry(apiData.nation.country);
-
-if (!topCountry) {
-  return res.status(502).json({
-    status: "error",
-    message: "Nationalize returned an invalid response"
-  });
-}
-
-
-// READ ALL PROFILES WITH OPTIONAL FILTERS
 export const getAllProfiles = async (req, res) => {
   try {
     let {
@@ -182,24 +175,6 @@ export const getAllProfiles = async (req, res) => {
       message: "Internal server error"
     });
   }
-};
-
-
-// READ SINGLE PROFILE BY ID
-export const getProfile = async (req, res) => {
-  const profile = await Profile.findOne({ id: req.params.id });
-
-  if (!profile) {
-    return res.status(404).json({
-      status: "error",
-      message: "Profile not found"
-    });
-  }
-
-  return res.status(200).json({
-    status: "success",
-    data: profile
-  });
 };
 
 
