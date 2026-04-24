@@ -5,15 +5,15 @@ export const parseQuery = (q) => {
   const filters = {};
 
   // -----------------------
-  // GENDER (CRITICAL FIX)
+  // STEP 1: GENDER (PRIORITY FIX)
   // -----------------------
   const hasMale = /\bmale\b/.test(query);
   const hasFemale = /\bfemale\b/.test(query);
 
-  // IMPORTANT RULE:
-  // If BOTH appear → DO NOT SET gender
+  // CRITICAL RULE:
+  // if both appear → DO NOT SET gender
   if (hasMale && hasFemale) {
-    // intentionally empty
+    // intentionally ignore gender
   } else if (hasMale) {
     filters.gender = "male";
   } else if (hasFemale) {
@@ -21,7 +21,30 @@ export const parseQuery = (q) => {
   }
 
   // -----------------------
-  // AGE GROUP
+  // STEP 2: AGE EXPRESSIONS FIRST (IMPORTANT FIX)
+  // -----------------------
+
+  // "above 30", "older than 30"
+  let match = query.match(/(above|older than)\s*(\d+)/);
+  if (match) {
+    filters.min_age = Number(match[2]);
+  }
+
+  // "between 20 and 30"
+  match = query.match(/between\s*(\d+)\s*and\s*(\d+)/);
+  if (match) {
+    filters.min_age = Number(match[1]);
+    filters.max_age = Number(match[2]);
+  }
+
+  // "30+"
+  match = query.match(/(\d+)\+/);
+  if (match) {
+    filters.min_age = Number(match[1]);
+  }
+
+  // -----------------------
+  // STEP 3: KEYWORD AGE GROUP
   // -----------------------
   if (query.includes("child")) filters.age_group = "child";
   if (query.includes("teenager") || query.includes("teenagers") || query.includes("teen")) {
@@ -31,7 +54,7 @@ export const parseQuery = (q) => {
   if (query.includes("senior")) filters.age_group = "senior";
 
   // -----------------------
-  // YOUNG RULE (IMPORTANT)
+  // STEP 4: "YOUNG" RULE (CRITICAL TEST CASE)
   // -----------------------
   if (query.includes("young")) {
     filters.min_age = 16;
@@ -39,21 +62,7 @@ export const parseQuery = (q) => {
   }
 
   // -----------------------
-  // AGE CONDITIONS
-  // -----------------------
-  const aboveMatch = query.match(/(?:above|older than)\s*(\d+)|(\d+)\+/);
-  if (aboveMatch) {
-    filters.min_age = Number(aboveMatch[1] || aboveMatch[2]);
-  }
-
-  const betweenMatch = query.match(/between\s*(\d+)\s*and\s*(\d+)/);
-  if (betweenMatch) {
-    filters.min_age = Number(betweenMatch[1]);
-    filters.max_age = Number(betweenMatch[2]);
-  }
-
-  // -----------------------
-  // COUNTRY
+  // STEP 5: COUNTRY (STRICT MATCH)
   // -----------------------
   const countryMap = {
     nigeria: "NG",
