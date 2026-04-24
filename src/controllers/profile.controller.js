@@ -66,28 +66,116 @@ export const createProfile = async (req, res) => {
 };
 
 
+// VALIDATE EXTERNAL API RESPONSES
+if (!apiData.gender.gender || apiData.gender.count === 0) {
+  return res.status(502).json({
+    status: "error",
+    message: "Genderize returned an invalid response"
+  });
+}
+
+if (!apiData.age.age) {
+  return res.status(502).json({
+    status: "error",
+    message: "Agify returned an invalid response"
+  });
+}
+
+const topCountry = getTopCountry(apiData.nation.country);
+
+if (!topCountry) {
+  return res.status(502).json({
+    status: "error",
+    message: "Nationalize returned an invalid response"
+  });
+}
+
+
 // READ ALL PROFILES WITH OPTIONAL FILTERS
 export const getAllProfiles = async (req, res) => {
   try {
-    const { gender, country_id, age_group } = req.query;
+    let {
+      gender,
+      age_group,
+      country_id,
+      min_age,
+      max_age,
+      min_gender_probability,
+      min_country_probability,
+      sort_by = "created_at",
+      order = "asc",
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // --- VALIDATION ---
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    if (isNaN(page) || isNaN(limit)) {
+      return res.status(422).json({
+        status: "error",
+        message: "Invalid query parameters"
+      });
+    }
+
+    if (limit > 50) limit = 50;
 
     const filter = {};
 
+    // --- FILTERS ---
     if (gender) filter.gender = gender.toLowerCase();
-    if (country_id) filter.country_id = country_id.toUpperCase();
     if (age_group) filter.age_group = age_group.toLowerCase();
+    if (country_id) filter.country_id = country_id.toUpperCase();
 
-    const profiles = await Profile.find(filter)
-      .select("id name gender age age_group country_id")
-      .lean();
+    if (min_age || max_age) {
+      filter.age = {};
+      if (min_age) filter.age.$gte = Number(min_age);
+      if (max_age) filter.age.$lte = Number(max_age);
+    }
+
+    if (min_gender_probability) {
+      filter.gender_probability = { $gte: Number(min_gender_probability) };
+    }
+
+    if (min_country_probability) {
+      filter.country_probability = { $gte: Number(min_country_probability) };
+    }
+
+    // --- SORT ---
+    const sortOptions = {};
+    const allowedSort = ["age", "created_at", "gender_probability"];
+
+    if (!allowedSort.includes(sort_by)) {
+      return res.status(422).json({
+        status: "error",
+        message: "Invalid query parameters"
+      });
+    }
+
+    sortOptions[sort_by] = order === "desc" ? -1 : 1;
+
+    // --- PAGINATION ---
+    const skip = (page - 1) * limit;
+
+    const [profiles, total] = await Promise.all([
+      Profile.find(filter)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Profile.countDocuments(filter)
+    ]);
 
     return res.status(200).json({
       status: "success",
-      count: profiles.length,
+      page,
+      limit,
+      total,
       data: profiles
     });
 
-  } catch {
+  } catch (err) {
     return res.status(500).json({
       status: "error",
       message: "Internal server error"
@@ -125,10 +213,5 @@ export const deleteProfile = async (req, res) => {
     });
   }
 
-  return res.status(204).json(
-    {
-      status: "success",
-      message: "Profile deleted"
-    }
-  );
+  return res.status(204).send();
 };

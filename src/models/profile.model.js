@@ -19,6 +19,6 @@ const profileSchema = new mongoose.Schema({
   created_at: String
 });
 
-// profileSchema.index({ name: 1 }, { unique: true });
+
 
 export default mongoose.model("Profile", profileSchema);
