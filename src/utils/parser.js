@@ -18,7 +18,7 @@ const parseQuery = (q) => {
   const query = q.toLowerCase().trim();
   const filters = {};
 
-  // -----------------------
+  
   // GENDER (STRICT RULE)
   // -----------------------
   const hasMale = /\bmale\b/.test(query);
@@ -29,9 +29,8 @@ const parseQuery = (q) => {
   } else if (hasFemale && !hasMale) {
     filters.gender = "female";
   }
-  // if both exist → DO NOT set gender (grader rule)
+  
 
-  // -----------------------
   // AGE GROUP (DIRECT)
   // -----------------------
   if (query.includes("child")) filters.age_group = "child";
@@ -39,7 +38,6 @@ const parseQuery = (q) => {
   if (query.includes("adult")) filters.age_group = "adult";
   if (query.includes("senior")) filters.age_group = "senior";
 
-  // -----------------------
   // AGE RANGE (PRIORITY RULES)
   // -----------------------
   let hasAgeFilter = false;
@@ -62,10 +60,8 @@ const parseQuery = (q) => {
     filters.min_age = 16;
     filters.max_age = 24;
   }
-
-  // -----------------------
+  
   // COUNTRY MATCHING
-  // -----------------------
   for (const key in countryMap) {
     if (query.includes(key)) {
       filters.country_id = countryMap[key];
